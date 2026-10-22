@@ -1,0 +1,154 @@
+/* =========================================================
+   Compartilhar matéria — baseado no Share Dock (Modelo 2).
+   Botão quadrado arredondado que se expande em diagonal até
+   virar um cartão com as redes para compartilhar a matéria.
+   ========================================================= */
+.sdock{
+    --sdock-bg:#001533; --sdock-bg-hover:#00264d; --sdock-accent:#00B4CC; --sdock-fg:#fff;
+    --sdock-surface:#fff; --sdock-text:#0f172a; --sdock-muted:#64748b; --sdock-line:rgba(0,0,0,.07);
+    --sdock-size:52px; --sdock-radius:16px; --sdock-focus:#ffbf00; --sdock-width:272px;
+    --sdock-ease:cubic-bezier(.2,.8,.2,1);
+    position:fixed; right:16px; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); z-index:1030;
+    width:var(--sdock-size); height:var(--sdock-size); font-family:inherit;
+}
+
+/* ---- Fundo escurecido leve (só celular) ---- */
+.sdock__scrim{ position:fixed; inset:0; z-index:-1; background:rgba(15,20,17,.22);
+    opacity:0; visibility:hidden; transition:opacity .3s, visibility 0s .3s; }
+@media (max-width:600px){
+    .sdock.is-open .sdock__scrim{ opacity:1; visibility:visible; transition:opacity .3s; }
+}
+
+/* ---- Botão (squircle) ---- */
+.sdock__toggle{ position:relative; z-index:2; display:grid; place-items:center;
+    width:100%; height:100%; border:0; border-radius:var(--sdock-radius); cursor:pointer;
+    background:var(--sdock-bg); color:var(--sdock-fg); font-size:1.15rem;
+    box-shadow:0 4px 14px rgba(0,0,0,.12); transition:background .2s, transform .2s, box-shadow .3s; }
+.sdock__toggle:hover{ background:var(--sdock-bg-hover); }
+.sdock__toggle:active{ transform:scale(.94); }
+.sdock__toggle i{ grid-area:1/1; transition:transform .35s var(--sdock-ease), opacity .2s; }
+.sdock__ico-close{ opacity:0; transform:rotate(-90deg) scale(.4); }
+.sdock.is-open .sdock__ico-open{ opacity:0; transform:rotate(90deg) scale(.4); }
+.sdock.is-open .sdock__ico-close{ opacity:1; transform:none; }
+.sdock.is-open .sdock__toggle{ box-shadow:none; }
+
+/* Pulso único para ser descoberto (desligado com movimento reduzido) */
+.sdock__toggle::before{ content:""; position:absolute; inset:0; border-radius:inherit;
+    box-shadow:0 0 0 0 rgba(0,180,204,.5); animation:sdock-pulse 1.6s ease-out 1.5s 2; pointer-events:none; }
+@keyframes sdock-pulse{ to{ box-shadow:0 0 0 14px rgba(0,180,204,0); } }
+
+/* Tooltip do botão (só com mouse e com o menu fechado) */
+@media (hover:hover){
+    .sdock__toggle::after{ content:attr(aria-label); position:absolute; right:calc(100% + 10px); top:50%;
+        transform:translate(4px,-50%); padding:7px 10px; border-radius:8px; white-space:nowrap;
+        background:#1d1d1b; color:#fff; font-size:.78rem; font-weight:600; line-height:1;
+        opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; }
+    .sdock:not(.is-open) .sdock__toggle:hover::after,
+    .sdock:not(.is-open) .sdock__toggle:focus-visible::after{ opacity:1; transform:translate(0,-50%); }
+}
+
+/* ---- Invólucro da sombra ----
+   O clip-path do cartão recorta tudo que fica fora dele, inclusive a box-shadow
+   (por isso a sombra nunca aparecia). O drop-shadow aqui fora acompanha a forma
+   já recortada, então a sombra segue o cartão durante toda a animação.
+   Não vai no .sdock: filter criaria um bloco de contenção e quebraria o
+   position:fixed do fundo escurecido (.sdock__scrim). */
+.sdock__card{ position:absolute; right:0; bottom:0; z-index:1;
+    -webkit-filter:drop-shadow(0 12px 22px rgba(0,21,51,.16)) drop-shadow(0 2px 4px rgba(0,21,51,.08));
+            filter:drop-shadow(0 12px 22px rgba(0,21,51,.16)) drop-shadow(0 2px 4px rgba(0,21,51,.08)); }
+
+/* ---- Cartão: fechado = recortado no tamanho do botão (canto inferior direito) ---- */
+.sdock__panel{ position:absolute; right:0; bottom:0; z-index:1; box-sizing:border-box;
+    width:min(var(--sdock-width), calc(100vw - 32px));
+    max-height:calc(100dvh - 120px); overflow-y:auto; overscroll-behavior:contain;
+    padding:16px 10px 0; border-radius:22px; border:1px solid var(--sdock-line);
+    background:var(--sdock-surface); color:var(--sdock-text);
+    -webkit-clip-path:inset(calc(100% - var(--sdock-size)) 0 0 calc(100% - var(--sdock-size)) round var(--sdock-radius));
+    clip-path:inset(calc(100% - var(--sdock-size)) 0 0 calc(100% - var(--sdock-size)) round var(--sdock-radius));
+    visibility:hidden;
+    transition:clip-path .35s var(--sdock-ease) .14s, visibility 0s linear .5s; }
+.sdock.is-open .sdock__panel{ visibility:visible; -webkit-clip-path:inset(0 round 22px); clip-path:inset(0 round 22px);
+    transition:clip-path .5s var(--sdock-ease), visibility 0s linear 0s; }
+
+/* Navegadores sem clip-path com "round" (Safari < 13.1, Edge legado): sem recorte,
+   o cartão abre com fade + escala a partir do botão, e a sombra volta a ser box-shadow. */
+@supports not ((clip-path:inset(0 round 1px)) or (-webkit-clip-path:inset(0 round 1px))){
+    .sdock__card{ -webkit-filter:none; filter:none; }
+    .sdock__panel{ opacity:0; transform:scale(.6); transform-origin:100% 100%;
+        box-shadow:0 12px 40px rgba(0,21,51,.16), 0 2px 6px rgba(0,21,51,.08);
+        transition:opacity .25s, transform .3s var(--sdock-ease), visibility 0s linear .3s; }
+    .sdock.is-open .sdock__panel{ opacity:1; transform:none; transition:opacity .25s, transform .4s var(--sdock-ease), visibility 0s; }
+}
+
+/* Conteúdo entra em cascata da direita depois que o cartão abre */
+.sdock__head, .sdock__list li, .sdock__foot{ opacity:0; transform:translateX(14px);
+    transition:opacity .12s, transform .12s; }
+.sdock.is-open .sdock__head, .sdock.is-open .sdock__list li, .sdock.is-open .sdock__foot{ opacity:1; transform:none;
+    transition:opacity .3s ease calc(.14s + var(--i, 0) * 35ms), transform .45s var(--sdock-ease) calc(.14s + var(--i, 0) * 35ms); }
+
+.sdock__head{ padding:0 8px 10px; margin-bottom:6px; border-bottom:1px solid var(--sdock-line); }
+.sdock__title{ margin:0; font-size:1rem; font-weight:800; line-height:1.2; }
+.sdock__sub{ margin:2px 0 0; font-size:.8rem; color:var(--sdock-muted); }
+
+.sdock__list{ list-style:none; margin:0; padding:0; }
+.sdock__list a{ display:flex; align-items:center; gap:12px; min-height:52px; padding:6px 8px;
+    border-radius:14px; color:inherit; text-decoration:none; transition:background .15s; }
+.sdock__list a:hover{ background:color-mix(in srgb, var(--c) 10%, transparent); }
+.sdock__ico{ display:grid; place-items:center; flex:0 0 36px; height:36px; border-radius:11px;
+    background:var(--c, var(--sdock-bg)); color:#fff; font-size:1rem;
+    transition:transform .25s var(--sdock-ease); }
+.sdock__list a:hover .sdock__ico{ transform:scale(1.08) rotate(-6deg); }
+.sdock__txt{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.sdock__txt strong{ font-size:.92rem; font-weight:700; line-height:1.2; }
+.sdock__txt small{ font-size:.76rem; color:var(--sdock-muted); line-height:1.25; }
+.sdock__go{ font-size:.72rem; color:var(--sdock-muted); opacity:.55;
+    transition:transform .2s var(--sdock-ease), color .2s, opacity .2s; }
+.sdock__list a:hover .sdock__go, .sdock__list a:focus-visible .sdock__go{ opacity:1; color:var(--c); transform:translate(2px,-2px); }
+
+/* Rodapé: compartilhar esta página, ao lado do botão de fechar */
+.sdock__foot{ display:flex; align-items:center; height:var(--sdock-size); margin:6px calc(var(--sdock-size) + 4px) 0 0;
+    border-top:1px solid var(--sdock-line); }
+.sdock__share{ display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 10px;
+    border:0; border-radius:12px; background:transparent; color:var(--sdock-bg-hover);
+    font-family:inherit; font-size:.82rem; font-weight:700; white-space:nowrap; cursor:pointer; transition:background .15s; }
+.sdock__share:hover{ background:color-mix(in srgb, var(--sdock-bg) 10%, transparent); }
+
+.sdock__toggle:focus-visible, .sdock__list a:focus-visible, .sdock__share:focus-visible{ outline:3px solid var(--sdock-focus); outline-offset:2px; }
+.sdock__sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+
+@media (prefers-reduced-motion:reduce){
+    .sdock *, .sdock *::before{ transition-duration:.01ms !important; transition-delay:0s !important; animation:none !important; }
+}
+
+/* Rodapé com dois botões: "Copiar link" e "Mais opções" (menu nativo, só no celular) */
+.sdock__foot{ gap:2px; }
+.sdock__foot .sdock__share{ padding:0 8px; }
+.sdock__share[hidden]{ display:none; }
+
+
+/* =========================================================
+   Área STORIES (bolinhas com anel, como nos apps)
+   ========================================================= */
+.sdock__label{ margin:10px 8px 6px; font-size:.72rem; font-weight:700; color:var(--sdock-muted); }
+.sdock__stories{ display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; padding:0 2px 4px; }
+.sdock__story{ display:flex; flex-direction:column; align-items:center; gap:7px; min-height:44px; padding:10px 4px 8px;
+    border:1px solid var(--sdock-line); border-radius:14px; background:var(--sdock-surface); color:var(--sdock-text);
+    font-family:inherit; font-size:.76rem; font-weight:700; line-height:1.1; cursor:pointer;
+    transition:background .15s, border-color .15s, transform .2s var(--sdock-ease); }
+.sdock__story:hover{ background:color-mix(in srgb, var(--c) 8%, #fff); border-color:color-mix(in srgb, var(--c) 35%, transparent); }
+.sdock__story:active{ transform:scale(.96); }
+/* Ícone com anel de "story" (anel colorido + respiro branco) */
+.sdock__story-ico{ display:grid; place-items:center; width:42px; height:42px; border-radius:50%;
+    background:var(--c); color:#fff; font-size:1.05rem;
+    box-shadow:0 0 0 2px #fff, 0 0 0 4px var(--c); transition:transform .25s var(--sdock-ease); }
+.sdock__story-ico--ig{ background:#d62976;
+    background:radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%);
+    box-shadow:0 0 0 2px #fff, 0 0 0 4px #d6249f; }
+.sdock__story:hover .sdock__story-ico{ transform:scale(1.08); }
+.sdock__story-txt{ display:flex; flex-direction:column; align-items:center; gap:2px; text-align:center; }
+.sdock__story-txt small{ font-size:.66rem; font-weight:500; color:var(--sdock-muted); }
+.sdock__story:focus-visible{ outline:3px solid var(--sdock-focus); outline-offset:2px; }
+.sdock__label + .sdock__list{ margin-top:-2px; }
+
+.sdock__story.is-busy{ cursor:progress; }
